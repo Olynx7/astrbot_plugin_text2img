@@ -1,0 +1,41 @@
+{
+    "provider": {
+        "description": "选择文生图服务提供商",
+        "type": "string",
+        "default": "gitee",
+        "hint": "支持: gitee (Gitee AI), aliyun (阿里百炼), volcengine (字节火山)",
+        "options": ["gitee", "aliyun", "volcengine"]
+    },
+    "base_url": {
+        "description": "API Base URL",
+        "type": "string",
+        "default": "https://ai.gitee.com/v1",
+        "hint": "API 地址。Gitee: https://ai.gitee.com/v1; 阿里: https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation; 火山: https://ark.cn-beijing.volces.com/api/v3"
+    },
+    "api_key": {
+        "description": "API 密钥 (支持多 Key 轮询)",
+        "type": "list",
+        "hint": "API Key，支持配置多个 Key 以实现轮询调用",
+        "default": [],
+        "obvious_hint": true
+    },
+    "model": {
+        "description": "使用的模型名称",
+        "type": "string",
+        "default": "z-image-turbo",
+        "hint": "Gitee: z-image-turbo; 阿里: qwen-image-max/z-image-turbo/wan2.6-t2i; 火山: doubao-seedream-4-5-251128"
+    },
+    "ratio": {
+        "description": "图片比例",
+        "type": "string",
+        "default": "1:1",
+        "hint": "支持: 1:1, 4:3, 3:4, 3:2, 2:3, 16:9, 9:16",
+        "options": ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"]
+    },
+    "negative_prompt": {
+        "description": "负面提示词",
+        "type": "string",
+        "default": "",
+        "hint": "用于指定不希望出现在生成图片中的内容"
+    }
+}
