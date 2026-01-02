@@ -55,18 +55,18 @@ class MultiPlatformText2Image(Star):
         super().__init__(context)
         self.config = config
         self.provider_name = config.get("provider", "gitee").lower()
-        
+
         # 解析 API Keys
         self.api_keys = self._parse_api_keys(config.get("api_key", []))
-        
+
         # 模型配置
         self.model = config.get("model", DEFAULT_MODEL)
         self.ratio = config.get("ratio", DEFAULT_RATIO)
         self.negative_prompt = config.get("negative_prompt", DEFAULT_NEGATIVE_PROMPT)
-        
+
         # 创建 provider 实例
         self.provider = self._create_provider()
-        
+
         # 并发控制
         self.processing_users: set[str] = set()
         self.last_operations: dict[str, float] = {}
@@ -94,10 +94,10 @@ class MultiPlatformText2Image(Star):
         provider_class = PROVIDER_MAP.get(self.provider_name)
         if not provider_class:
             raise ValueError(f"不支持的provider: {self.provider_name}")
-        
+
         # 获取 base_url，如果配置中没有，则使用 provider 的默认值
         base_url = self.config.get("base_url") or provider_class.get_default_base_url()
-        
+
         # 创建 provider 实例
         return provider_class(
             api_keys=self.api_keys,
@@ -105,6 +105,7 @@ class MultiPlatformText2Image(Star):
             model=self.model,
             negative_prompt=self.negative_prompt,
         )
+
     def _get_image_dir(self) -> Path:
         """获取图片保存目录（延迟初始化）"""
         if self._image_dir is None:
@@ -127,7 +128,7 @@ class MultiPlatformText2Image(Star):
             images: list[Path] = []
             for ext in ("*.jpg", "*.png", "*.webp"):
                 images.extend(image_dir.glob(ext))
-            
+
             # 按修改时间排序
             images.sort(key=lambda p: p.stat().st_mtime)
 
@@ -171,9 +172,11 @@ class MultiPlatformText2Image(Star):
         self.last_operations[request_id] = current_time
         return False
 
-    async def _generate_image(self, prompt: str, ratio: str = "1:1", quality: str = "m") -> str:
+    async def _generate_image(
+        self, prompt: str, ratio: str = "1:1", quality: str = "m"
+    ) -> str:
         """调用文生图 API 生成图片，返回本地文件路径
-        
+
         Args:
             prompt: 提示词
             ratio: 图片比例 (1:1, 16:9 等)
@@ -184,24 +187,26 @@ class MultiPlatformText2Image(Star):
             supported_ratios = self.provider.get_supported_ratios()
             if ratio not in supported_ratios:
                 ratio = self.ratio  # 使用默认比例
-            
+
             # 根据 quality 选择尺寸 (s=0, m=1, h=2)
             quality_map = {"s": 0, "m": 1, "h": 2}
             quality_index = quality_map.get(quality, 1)  # 默认中等
-            
+
             size_list = supported_ratios[ratio]
             # 确保索引不越界
             size_index = min(quality_index, len(size_list) - 1)
             target_size = size_list[size_index]
-            
+
             # 调用 provider 生成图片
-            image_data, extension = await self.provider.generate_image(prompt, target_size)
-            
+            image_data, extension = await self.provider.generate_image(
+                prompt, target_size
+            )
+
             # 保存到本地
             filepath = self._get_save_path(extension)
             async with aiofiles.open(filepath, "wb") as f:
                 await f.write(image_data)
-            
+
             # 每 N 次生成执行一次清理
             self._generation_count += 1
             if self._generation_count >= CLEANUP_INTERVAL:
@@ -209,10 +214,10 @@ class MultiPlatformText2Image(Star):
                 task = asyncio.create_task(self._cleanup_old_images())
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)
-            
+
             return filepath
         except Exception as e:
-            raise Exception(f"生成图片失败: {str(e)}")
+            raise Exception(f"生成图片失败: {str(e)}") from e
 
     @filter.llm_tool(name="draw_image")  # type: ignore
     async def draw(self, event: AstrMessageEvent, prompt: str):
@@ -244,7 +249,13 @@ class MultiPlatformText2Image(Star):
             self.processing_users.discard(request_id)
 
     @filter.command("t2img")
-    async def generate_image_command(self, event: AstrMessageEvent, prompt: str, ratio: str = "1:1", quality: str = "s"):
+    async def generate_image_command(
+        self,
+        event: AstrMessageEvent,
+        prompt: str,
+        ratio: str = "1:1",
+        quality: str = "s",
+    ):
         """生成图片指令
 
         用法: /t2img <提示词> [比例]
@@ -259,11 +270,11 @@ class MultiPlatformText2Image(Star):
         if not ratio:
             yield event.plain_result("默认使用 1:1 比例生成图片。")
             ratio = "1:1"
-        
+
         if ratio not in self.provider.get_supported_ratios():
             yield event.plain_result(f"不支持的比例 '{ratio}'，使用默认 1:1 比例。")
             ratio = "1:1"
-        
+
         if quality not in ("s", "m", "h"):
             yield event.plain_result("质量参数无效，使用默认低质量 (s)。")
             quality = "s"
@@ -285,11 +296,15 @@ class MultiPlatformText2Image(Star):
         # 验证比例参数
         supported_ratios = self.provider.get_supported_ratios()
         if ratio not in supported_ratios:
-            yield event.plain_result(f"不支持的比例 '{ratio}'，使用默认 {self.ratio} 比例。")
+            yield event.plain_result(
+                f"不支持的比例 '{ratio}'，使用默认 {self.ratio} 比例。"
+            )
             ratio = self.ratio
 
         try:
-            logger.info(f"用户 {user_id} 请求生成图片，Prompt: {prompt}, 比例: {ratio}, 质量: {quality}")
+            logger.info(
+                f"用户 {user_id} 请求生成图片，Prompt: {prompt}, 比例: {ratio}, 质量: {quality}"
+            )
             image_path = await self._generate_image(prompt, ratio, quality)
             yield event.chain_result([Image.fromFileSystem(image_path)])  # type: ignore
 
@@ -302,11 +317,3 @@ class MultiPlatformText2Image(Star):
     async def close(self) -> None:
         """清理资源"""
         await self.provider.close()
-
-    def __del__(self):
-        """析构时尝试清理资源"""
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.provider.close())
-        except RuntimeError:
-            pass
