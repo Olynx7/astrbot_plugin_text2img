@@ -1,7 +1,7 @@
 """AstrBot 多平台文生图插件
 
 支持 Gitee AI、阿里云百炼、字节火山引擎三大平台。
-支持 LLM 工具调用和 /t2i 命令调用，支持多种图片比例和多 Key 轮询。
+支持 /t2img 命令调用，支持多种图片比例和多 Key 轮询。
 """
 
 import asyncio
@@ -243,17 +243,17 @@ class MultiPlatformText2Image(Star):
         finally:
             self.processing_users.discard(request_id)
 
-    @filter.command("t2i")
+    @filter.command("t2img")
     async def generate_image_command(self, event: AstrMessageEvent, prompt: str, ratio: str = "1:1", quality: str = "s"):
         """生成图片指令
 
-        用法: /t2i <提示词> [比例]
-        示例: /t2i 一个女孩 9:16
+        用法: /t2img <提示词> [比例]
+        示例: /t2img 一个女孩 9:16
         支持比例: 1:1, 4:3, 3:4, 3:2, 2:3, 16:9, 9:16
         质量参数： s (低质量), m (中等), h (高质量)
         """
         if not prompt:
-            yield event.plain_result("请提供提示词！使用方法：/t2i <提示词> [比例]")
+            yield event.plain_result("请提供提示词！使用方法：/t2img <提示词> [比例]")
             return
 
         if not ratio:
