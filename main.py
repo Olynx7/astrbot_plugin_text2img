@@ -249,35 +249,57 @@ class MultiPlatformText2Image(Star):
             self.processing_users.discard(request_id)
 
     @filter.command("t2img")
-    async def generate_image_command(
-        self,
-        event: AstrMessageEvent,
-        prompt: str,
-        ratio: str = "1:1",
-        quality: str = "s",
-    ):
+    async def generate_image_command(self, event: AstrMessageEvent):
         """生成图片指令
 
-        用法: /t2img <提示词> [比例]
-        示例: /t2img 一个女孩 9:16
+        用法: /t2img <提示词> [比例] [质量]
+        示例: /t2img 一个女孩 9:16 h
         支持比例: 1:1, 4:3, 3:4, 3:2, 2:3, 16:9, 9:16
-        质量参数： s (低质量), m (中等), h (高质量)
+        质量参数: s (低质量), m (中等), h (高质量)
         """
-        if not prompt:
-            yield event.plain_result("请提供提示词！使用方法：/t2img <提示词> [比例]")
+        message_str = event.message_str  # 获取消息的纯文本内容
+
+        # 移除命令前缀
+        content = message_str.strip()
+        if content.startswith("t2img"):
+            content = content[5:].strip()  # 移除 "t2img "
+
+        if not content:
+            yield event.plain_result("请提供提示词！使用方法：/t2img <提示词> [比例] [质量]")
             return
+        
+        logger.debug(f"收到 /t2img 命令，内容: {content}")
 
-        if not ratio:
-            yield event.plain_result("默认使用 1:1 比例生成图片。")
-            ratio = "1:1"
+        # 解析参数：从右向左提取可选参数
+        parts = content.split()
+        prompt = content
+        ratio = "1:1"
+        quality = "s"
 
-        if ratio not in self.provider.get_supported_ratios():
-            yield event.plain_result(f"不支持的比例 '{ratio}'，使用默认 1:1 比例。")
-            ratio = "1:1"
+        logger.debug(f"解析参数，初始 parts: {parts}")
 
-        if quality not in ("s", "m", "h"):
-            yield event.plain_result("质量参数无效，使用默认低质量 (s)。")
-            quality = "s"
+        # 支持的比例和质量选项
+        supported_ratios = self.provider.get_supported_ratios()
+        valid_qualities = {"s", "m", "h"}
+
+        # 尝试提取最后一个参数作为 quality
+        if len(parts) > 1 and parts[-1] in valid_qualities:
+            quality = parts[-1]
+            parts = parts[:-1]
+            prompt = " ".join(parts)
+            logger.debug(f"提取质量参数: {quality}, 剩余 parts: {parts}, prompt: {prompt}")
+
+        # 尝试提取最后一个参数作为 ratio
+        if len(parts) > 1 and parts[-1] in supported_ratios:
+            ratio = parts[-1]
+            parts = parts[:-1]
+            prompt = " ".join(parts)
+            logger.debug(f"提取比例参数: {ratio}, 剩余 parts: {parts}, prompt: {prompt}")
+
+        # 如果 prompt 为空
+        if not prompt.strip():
+            yield event.plain_result("请提供提示词！使用方法：/t2img <提示词> [比例] [质量]")
+            return
 
         user_id = event.get_sender_id()
         request_id = user_id
@@ -293,13 +315,7 @@ class MultiPlatformText2Image(Star):
 
         self.processing_users.add(request_id)
 
-        # 验证比例参数
-        supported_ratios = self.provider.get_supported_ratios()
-        if ratio not in supported_ratios:
-            yield event.plain_result(
-                f"不支持的比例 '{ratio}'，使用默认 {self.ratio} 比例。"
-            )
-            ratio = self.ratio
+        logger.debug(f"用户 {user_id} 请求生成图片，Prompt: {prompt}, 比例: {ratio}, 质量: {quality}")
 
         try:
             logger.info(
